@@ -273,7 +273,7 @@ if "page" in st.session_state and st.session_state["page"] == "questionnaire":
 if "page" in st.session_state and st.session_state["page"] == "diagnostic":
     st.header("Résultat du Diagnostic")
     #loaded_model = joblib.load(r"C:\Users\Eliezer\Projets_methode_avancee\RandomForest_model.pkl")
-    loaded_model = joblib.load(r"C:\Users\tanoh\Projets_methode_avancee\RandomForest_model.pkl")
+    loaded_model = joblib.load(RandomForest_model.pkl)
     user_input = np.array(list(st.session_state["responses"].values())).reshape(1, -1)
     predicted_disease = loaded_model.predict(user_input)[0]
     confidence = max(loaded_model.predict_proba(user_input)[0]) * 100
