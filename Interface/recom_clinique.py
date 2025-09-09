@@ -12,6 +12,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 import joblib
 import os
+import matplotlib.pyplot as plt
+
 
 from fpdf import FPDF
 import base64
@@ -138,12 +140,12 @@ def export_pdf(name, surname, age, height, weight, sex, predicted_disease, confi
     pdf.add_page()
 
     # En-tête style ordonnance
-    pdf.set_fill_color(200, 220, 255)  # Bleu clair
+    pdf.set_fill_color(200, 220, 255)
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(0, 12, "Rapport Médical - Diagnostic AI", ln=True, align="C", fill=True)
     pdf.ln(5)
     pdf.set_draw_color(0, 0, 0)
-    pdf.line(10, 25, 200, 25)  # ligne de séparation
+    pdf.line(10, 25, 200, 25)  
     pdf.ln(10)
 
     # Infos personnelles encadrées
@@ -160,7 +162,7 @@ def export_pdf(name, surname, age, height, weight, sex, predicted_disease, confi
     pdf.ln(5)
 
     # Résultat du diagnostic
-    pdf.set_fill_color(255, 230, 230)  # rose clair
+    pdf.set_fill_color(255, 230, 230) 
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(0, 10, "Résultat du diagnostic", ln=True, fill=True)
     pdf.ln(2)
@@ -171,7 +173,7 @@ def export_pdf(name, surname, age, height, weight, sex, predicted_disease, confi
     pdf.ln(5)
 
     # Indicateurs santé
-    pdf.set_fill_color(230, 255, 230)  # vert clair
+    pdf.set_fill_color(230, 255, 230)
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(0, 10, "Indicateurs de santé", ln=True, fill=True)
     pdf.ln(2)
@@ -181,7 +183,7 @@ def export_pdf(name, surname, age, height, weight, sex, predicted_disease, confi
     pdf.ln(5)
 
     # Symptômes
-    pdf.set_fill_color(255, 255, 200)  # jaune clair
+    pdf.set_fill_color(255, 255, 200)
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(0, 10, "Symptômes déclarés", ln=True, fill=True)
     pdf.ln(2)
@@ -228,11 +230,6 @@ def export_pdf(name, surname, age, height, weight, sex, predicted_disease, confi
 
 
 
-
-
-
-
-
 # Interface utilisateur
 st.title("Système de Diagnostic Médical AI")
 
@@ -254,10 +251,9 @@ if "page" in st.session_state and st.session_state["page"] == "questionnaire":
     responses = {}
 
     for symptom in symptoms:
-        # Affichage du symptôme en gras et en plus grand
         st.markdown(f"<h3 style='font-weight: bold; font-size:24px;'>{symptom} ?</h3>", unsafe_allow_html=True)
         
-        # Utilisation d'une clé unique pour chaque bouton radio
+        # Utilisation d'une clé pour chaque bouton radio
         answer = st.radio("", ("Oui", "Non"), index=1, key=symptom)
         
         # Stocker la réponse sous forme binaire
@@ -272,17 +268,72 @@ if "page" in st.session_state and st.session_state["page"] == "questionnaire":
 # Étape 3 : Diagnostic final
 if "page" in st.session_state and st.session_state["page"] == "diagnostic":
     st.header("Résultat du Diagnostic")
-    #loaded_model = joblib.load(r"C:\Users\Eliezer\Projets_methode_avancee\RandomForest_model.pkl")
-    loaded_model = joblib.load("RandomForest_model.pkl")
+    loaded_model = joblib.load(r"C:\Users\tanoh\Projets_methode_avancee\RandomForest_model.pkl")
+    # loaded_model = joblib.load("RandomForest_model.pkl")
     user_input = np.array(list(st.session_state["responses"].values())).reshape(1, -1)
     predicted_disease = loaded_model.predict(user_input)[0]
     confidence = max(loaded_model.predict_proba(user_input)[0]) * 100
     
     st.write(f"### Diagnostic probable : {predicted_disease}")
     st.write(f"### Précision du modèle : {confidence:.2f}%")
+
+    ################################################# NOUVELLE FONCT ####################################
+
+    # Diagnostic
+    y_pred_proba = loaded_model.predict_proba(user_input)[0]  # toutes les probabilités
+    confidence = np.max(y_pred_proba) * 100
+
+    # Associer probas à chaque maladie
+    probas = {loaded_model.classes_[i]: p for i, p in enumerate(y_pred_proba)}
+
+
+    # Affichage sur la meme ligne
+    col1, col2 = st.columns(2)
+
+    # Graphique Radar
+    with col1:
+        if predicted_disease in symptoms_dict:
+            labels = symptoms_dict[predicted_disease]
+            valeurs_patient = [1 if st.session_state["responses"].get(sympt, 0) == 1 else 0 for sympt in labels]
+            valeurs_typiques = [1] * len(labels)
+
+            angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist()
+            valeurs_patient += valeurs_patient[:1]
+            valeurs_typiques += valeurs_typiques[:1]
+            angles += angles[:1]
+
+            fig, ax = plt.subplots(figsize=(5,5), subplot_kw=dict(polar=True))
+            ax.plot(angles, valeurs_typiques, 'r-', linewidth=2, label="Symptômes typiques")
+            ax.fill(angles, valeurs_typiques, 'r', alpha=0.2)
+            ax.plot(angles, valeurs_patient, 'b-', linewidth=2, label="Symptômes déclarés")
+            ax.fill(angles, valeurs_patient, 'b', alpha=0.2)
+            ax.set_xticks(angles[:-1])
+            ax.set_xticklabels(labels, fontsize=9)
+            ax.set_yticks([])
+            ax.legend(loc="upper right", bbox_to_anchor=(0.1, 0.1))
+            st.pyplot(fig)
+
+    # Top 3 maladies
+    with col2:
+        top3 = dict(sorted(probas.items(), key=lambda x: x[1], reverse=True)[:3])
+
+        fig, ax = plt.subplots(figsize=(5,5))
+        ax.bar(top3.keys(), [v*100 for v in top3.values()], color=["#ff9999","#66b3ff","#99ff99"])
+        ax.set_ylabel("Probabilité (%)")
+        ax.set_title("Top 3 maladies probables")
+        st.pyplot(fig)
+
+
+
+
+    ####################################################
+
+
     st.write("Vos réponses ont été enregistrées pour améliorer le modèle.")
+
+
     
-    # Informations de santé basées sur la taille, le poids, l'âge et le sexe
+    
     st.subheader("Informations de santé supplémentaires")
     
     # Calcul de l'IMC
@@ -342,7 +393,6 @@ if "page" in st.session_state and st.session_state["page"] == "diagnostic":
     if specialite in medecins_affilies:
         st.subheader("Médecins affiliés recommandés")
     
-        # Préparer les données pour le tableau
         data = []
         for medecin in medecins_affilies[specialite]:
             whatsapp_link = f"https://wa.me/{medecin['contact'].replace(' ', '').replace('+', '')}"
@@ -353,10 +403,8 @@ if "page" in st.session_state and st.session_state["page"] == "diagnostic":
                 "WhatsApp": f"[Contacter]({whatsapp_link})"
             })
     
-        # Convertir en DataFrame
         df_medecins = pd.DataFrame(data)
     
-        # Afficher le tableau avec markdown cliquable pour WhatsApp
         st.markdown(
             df_medecins.to_markdown(index=False),
             unsafe_allow_html=True
@@ -372,7 +420,7 @@ if "page" in st.session_state and st.session_state["page"] == "diagnostic":
             predicted_disease, confidence, bmi, bmr,
             specialites.get(predicted_disease, "Médecine générale"),
             st.session_state["responses"],
-            medecins_affilies.get(specialite, [])  # récupération des médecins de cette spécialité
+            medecins_affilies.get(specialite, [])  
         )
 
         
